@@ -574,6 +574,30 @@ class _matrix(object):
                 yield self[i,j]
 
     def __mul__(self, other):
+        
+#        print('mult')
+#        print(self.__data.keys())
+#        print(other.__data.keys())
+        if isinstance(other, self.ctx.matrix):
+            # dot multiplication  TODO: use Strassen's method?
+            if self.__cols != other.__rows:
+                raise ValueError('dimensions not compatible for multiplication')
+            new = self.ctx.matrix(self.__rows, other.__cols)
+            for i in xrange(self.__rows):
+                # get all __data.keys() where first entry == i
+                for j in xrange(other.__cols):
+                    new[i, j] = self.ctx.fdot((self[i,k], other[k,j])
+                                     for k in xrange(self.__cols) if (i,k) in self.__data.keys()) # instead of xrange(self.__cols) find nonzero entries
+            return new
+        else:
+            # try scalar multiplication
+            new = self.ctx.matrix(self.__rows, self.__cols)
+            for i in xrange(self.__rows):
+                for j in xrange(self.__cols):
+                    new[i, j] = other * self[i, j]
+            return new
+
+    def old_mul(self,other):
         if isinstance(other, self.ctx.matrix):
             # dot multiplication  TODO: use Strassen's method?
             if self.__cols != other.__rows:
