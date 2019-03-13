@@ -579,10 +579,13 @@ class _matrix(object):
             if self.__cols != other.__rows:
                 raise ValueError('dimensions not compatible for multiplication')
             new = self.ctx.matrix(self.__rows, other.__cols)
-            for i in xrange(self.__rows):
+            # loop over nonzero entries of self
+            for i,k in self.__data:
+                # loop over all entries of other
                 for j in xrange(other.__cols):
-                    # make sure that self[i,k] and other[i,k] are nonzero
-                    new[i, j] = self.ctx.fdot((self[i,k], other[k,j]) for k in xrange(other.__rows) if ((i,k) in self.__data and (k,j) in other.__data))
+                    # make sure that other[i,k] is nonzero
+                    if (k,j) in other.__data:
+                        new[i,j] += self[i,k]*other[k,j]
             return new
         else:
             # try scalar multiplication
