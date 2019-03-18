@@ -432,12 +432,16 @@ class _matrix(object):
 
     def __getitem__(self, key):
         '''
-            Getitem function for mp matrix class
-            it allows the following assingments:
-                - `i,j` values (will return scalar)
-                - slices
-                - integer array
-                - boolean mask
+        getitem function for mp matrix class it allows the following assingments:
+        - `i,j` value (will return scalar)
+        - slices
+        - integer array
+        - boolean mask
+        
+           
+        Notes
+        -----
+        If you slice out of bounds, we now map it back into bounds (the same way default python lists work)
         '''
         
         def get_indices(key_1d,depth):
@@ -449,15 +453,20 @@ class _matrix(object):
             elif isinstance(key_1d,slice):
                 return xrange(*key_1d.indices(depth))
             elif isinstance(key_1d,list):
-                if isinstance(key_1d[0],int):
+                if isinstance(key_1d[0],bool):
+                    if len(key_1d) != depth:
+                        raise IndexError('boolean mask does not match dimension size')
+                    return [i for i,x in enumerate(key_1d) if x] # return list so that we can take length later
+                elif isinstance(key_1d[0],int):
+                    if min(key_1d)<0 or max(key_1d) >= depth:
+                        raise IndexError('index is out of bounds')
                     return key_1d
-                elif isinstance(key_1d[0],bool):
-                    return (i for i, x in enumerate(key_1d) if x)
                 else:
-                    raise ValueError('index array must be int or bool')
+                    raise IndexError('index array must be int or bool')
             else:
-                raise ValueError('index type not understood')
+                raise IndexError('index type not understood')
         
+        # parse key
         if isinstance(key,int):
             # if the matrix is a vector pull element
             if self.rows == 1:
@@ -470,10 +479,13 @@ class _matrix(object):
             else:
                 i = key
                 j = slice(None,None,None)
+        elif isinstance(key,slice):
+            i = key
+            j = slice(None,None,None)
         elif len(key) == 2:
             i,j = key
         else:
-            raise ValueError('mpmatrix class is only two dimensional')
+            raise IndexError('mpmatrix class only allows two dimensional matrices')
 
         i_intlike = isinstance(i,int)
         j_intlike = isinstance(j,int)
@@ -494,8 +506,11 @@ class _matrix(object):
         
         # otherwise return submatrix of original matrix as mpmatrix class
         else:
-            i_indices = get_indices(key[0],self.__rows)
-            j_indices = get_indices(key[1],self.__cols)
+            i_indices = get_indices(i,self.__rows)
+            j_indices = get_indices(j,self.__cols)
+            
+            print(i_indices)
+            print(j_indices)
             
             m = self.ctx.matrix(len(i_indices),len(j_indices))
             # note that x,y is used to index the new submatrix and i,j is used to index the original matrix
@@ -506,6 +521,16 @@ class _matrix(object):
             return m
 
     def __setitem__(self, key, value):
+        '''
+        setitem function for mp matrix class it allows assingment from scalar or matrix of same size:
+        - `i,j`
+        - slices
+        - integer array
+        - boolean mask
+        '''
+        
+        
+        
         # setitem function for mp matrix class with slice index enabled
         # it allows the following assingments
         #  scalar to a slice of the matrix
