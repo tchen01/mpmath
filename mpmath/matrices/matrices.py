@@ -432,68 +432,78 @@ class _matrix(object):
 
     def __getitem__(self, key):
         '''
-            Getitem function for mp matrix class with slice index enabled
-            it allows the following assingments
-            scalar to a slice of the matrix
-         B = A[:,2:6]
+            Getitem function for mp matrix class
+            it allows the following assingments:
+                - `i,j` values (will return scalar)
+                - slices
+                - integer array
+                - boolean mask
         '''
-        # Convert vector to matrix indexing
-        if isinstance(key, int) or isinstance(key,slice):
-            # only sufficent for vectors
-            if self.__rows == 1:
-                key = (0, key)
-            elif self.__cols == 1:
-                key = (key, 0)
-            else:
-                raise IndexError('insufficient indices for matrix')
-
-        if isinstance(key[0],slice) or isinstance(key[1],slice):
-
-            #Rows
-            if isinstance(key[0],slice):
-                #Check bounds
-                if (key[0].start is None or key[0].start >= 0) and \
-                    (key[0].stop is None or key[0].stop <= self.__rows+1):
-                    # Generate indices
-                    rows = xrange(*key[0].indices(self.__rows))
+        
+        def get_indices(key_1d,depth):
+            '''
+            return iterable object which returns indices to pull along a dimension
+            '''
+            if isinstance(key_1d,int):
+                return xrange(key_1d,key_1d+1)
+            elif isinstance(key_1d,slice):
+                return xrange(*key_1d.indices(depth))
+            elif isinstance(key_1d,list):
+                if isinstance(key_1d[0],int):
+                    return key_1d
+                elif isinstance(key_1d[0],bool):
+                    return (i for i, x in enumerate(key_1d) if x)
                 else:
-                    raise IndexError('Row index out of bounds')
+                    raise ValueError('index array must be int or bool')
             else:
-                # Single row
-                rows = [key[0]]
-
-            # Columns
-            if isinstance(key[1],slice):
-                # Check bounds
-                if (key[1].start is None or key[1].start >= 0) and \
-                    (key[1].stop is None or key[1].stop <= self.__cols+1):
-                    # Generate indices
-                    columns = xrange(*key[1].indices(self.__cols))
-                else:
-                    raise IndexError('Column index out of bounds')
-
+                raise ValueError('index type not understood')
+        
+        if isinstance(key,int):
+            # if the matrix is a vector pull element
+            if self.rows == 1:
+                j = key
+                i = 0
+            elif self.cols == 1:
+                i = key
+                j = 0
+            # otherwise assume index is for row
             else:
-                # Single column
-                columns = [key[1]]
+                i = key
+                j = slice(None,None,None)
+        elif len(key) == 2:
+            i,j = key
+        else:
+            raise ValueError('mpmatrix class is only two dimensional')
 
-            # Create matrix slice
-            m = self.ctx.matrix(len(rows),len(columns))
+        i_intlike = isinstance(i,int)
+        j_intlike = isinstance(j,int)
+    
+        # return scalar if both dimensions are integers
+        if i_intlike and j_intlike:
+                
+            if i < 0:
+                i += self.__rows
+            if i < 0 or i >= self.__rows:
+                raise IndexError('index out of bounds')
+            if j < 0:
+                j += self.__cols
+            if j < 0 or j >= self.__cols:
+                raise IndexError('index out of bounds')
 
-            # Assign elements to the output matrix
-            for i,x in enumerate(rows):
-                for j,y in enumerate(columns):
-                    m.__set_element((i,j),self.__get_element((x,y)))
+            return self.__get_element((i,j))
+        
+        # otherwise return submatrix of original matrix as mpmatrix class
+        else:
+            i_indices = get_indices(key[0],self.__rows)
+            j_indices = get_indices(key[1],self.__cols)
+            
+            m = self.ctx.matrix(len(i_indices),len(j_indices))
+            # note that x,y is used to index the new submatrix and i,j is used to index the original matrix
+            for x,i in enumerate(i_indices):
+                for y,j in enumerate(j_indices):
+                    m.__set_element((x,y),self.__get_element((i,j)))
 
             return m
-
-        else:
-            # single element extraction
-            if key[0] >= self.__rows or key[1] >= self.__cols:
-                raise IndexError('matrix index out of range')
-            if key in self.__data:
-                return self.__data[key]
-            else:
-                return self.ctx.zero
 
     def __setitem__(self, key, value):
         # setitem function for mp matrix class with slice index enabled
